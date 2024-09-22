@@ -1,4 +1,5 @@
 const Job = require("../models/Job");
+const User = require("../models/User"); 
 
 exports.createJob = async (req, res) => {
   const { title, description, company, location, salary, type } = req.body;
@@ -99,6 +100,50 @@ exports.deleteJob = async (req, res) => {
     await Job.findByIdAndDelete(req.params.id);
 
     res.status(200).json({ message: "Job deleted successfully" });
+  } catch (err) {
+    console.error(err.message);
+    res.status(500).json({ message: "Server error" });
+  }
+};
+exports.applyToJob = async (req, res) => {
+  try {
+    const job = await Job.findById(req.params.id);
+    const user = await User.findById(req.user.id);
+
+    if (!job) {
+      return res.status(404).json({ message: "Job not found" });
+    }
+
+    // Check if user has already applied to the job
+    if (job.applicants.includes(req.user.id)) {
+      return res.status(400).json({ message: "You have already applied to this job" });
+    }
+
+    // Add user ID to the job's applicants array
+    job.applicants.push(req.user.id);
+    await job.save();
+
+    res.status(200).json({ message: "Successfully applied to the job", job });
+  } catch (err) {
+    console.error(err.message);
+    res.status(500).json({ message: "Server error" });
+  }
+};
+
+// Get all applicants for a specific job
+exports.getJobApplicants = async (req, res) => {
+  try {
+    const job = await Job.findById(req.params.id).populate("applicants", "name email resume");
+
+    if (!job) {
+      return res.status(404).json({ message: "Job not found" });
+    }
+
+    if (job.postedBy.toString() !== req.user.id) {
+      return res.status(403).json({ message: "You are not authorized to view the applicants" });
+    }
+
+    res.status(200).json(job.applicants);
   } catch (err) {
     console.error(err.message);
     res.status(500).json({ message: "Server error" });
